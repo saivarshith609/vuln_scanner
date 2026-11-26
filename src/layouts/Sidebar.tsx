@@ -113,25 +113,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
   ];
 
-  const secondaryNavItems = [
-    ...(user?.role === 'admin' ? [{
-      id: 'admin' as NavTabId,
-      label: 'Admin Control',
-      icon: UserCog,
-    }] : []),
-    ...(user?.role === 'admin' ? [{
-      id: 'settings' as NavTabId,
-      label: 'Settings',
-      icon: Settings,
-    }] : []),
-    {
-      id: 'design-system' as NavTabId,
-      label: 'Design System',
-      icon: Palette,
-      badge: 'Tokens',
-      badgeType: 'brand' as const,
-    },
-  ];
+  const isAdmin = user?.role === 'admin';
+  const secondaryNavItems = isAdmin
+    ? [
+        {
+          id: 'admin' as NavTabId,
+          label: 'Admin Control',
+          icon: UserCog,
+        },
+        {
+          id: 'settings' as NavTabId,
+          label: 'Settings',
+          icon: Settings,
+        },
+        {
+          id: 'design-system' as NavTabId,
+          label: 'Design System',
+          icon: Palette,
+          badge: 'Tokens',
+          badgeType: 'brand' as const,
+        },
+      ]
+    : [];
 
   const handleItemClick = (id: NavTabId) => {
     onSelectTab(id);
@@ -269,39 +272,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
 
-          <div className="vs-sidebar__section-title" style={{ marginTop: 'var(--space-4)' }}>
-            Configuration
-          </div>
+          {isAdmin && secondaryNavItems.length > 0 && (
+            <>
+              <div className="vs-sidebar__section-title" style={{ marginTop: 'var(--space-4)' }}>
+                Configuration
+              </div>
 
-          {secondaryNavItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentTab === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                className={`vs-sidebar__item ${isActive ? 'vs-sidebar__item--active' : ''}`}
-                data-label={item.label}
-                onClick={() => handleItemClick(item.id)}
-                title={isCollapsed && !isMobileOpen ? item.label : undefined}
-                aria-current={isActive ? 'page' : undefined}
-              >
-                <span className="vs-sidebar__icon">
-                  <Icon size={18} />
-                </span>
-                {(
-                  <>
+              {secondaryNavItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`vs-sidebar__item ${isActive ? 'vs-sidebar__item--active' : ''}`}
+                    data-label={item.label}
+                    onClick={() => handleItemClick(item.id)}
+                    title={isCollapsed && !isMobileOpen ? item.label : undefined}
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <span className="vs-sidebar__icon">
+                      <Icon size={18} />
+                    </span>
                     <span className="vs-sidebar__label">{item.label}</span>
                     {item.badge && (
                       <span className={`vs-sidebar__badge vs-sidebar__badge--${item.badgeType}`}>
                         {item.badge}
                       </span>
                     )}
-                  </>
-                )}
-              </button>
-            );
-          })}
+                  </button>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         <div className="vs-sidebar__footer">

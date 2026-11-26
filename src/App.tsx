@@ -42,6 +42,7 @@ function AppContent() {
     if (first === 'reports') return 'reports';
     if (first === 'settings') return 'settings';
     if (first === 'admin') return 'admin';
+    if (first === 'design-system') return 'design-system';
     return 'dashboard';
   };
   const [currentTab, setCurrentTab] = useState<NavTabId>(tabFromPath);
@@ -136,7 +137,7 @@ function AppContent() {
             : currentTab === 'reports' ? <ReportsPage />
               : currentTab === 'settings' ? <RoleGuard requiredRole="admin"><SettingsPage /></RoleGuard>
                 : currentTab === 'admin' ? <RoleGuard requiredRole="admin"><AdminPage /></RoleGuard>
-                : <DesignSystemShowcase />}
+                : <RoleGuard requiredRole="admin"><DesignSystemShowcase /></RoleGuard>}
       </Suspense>
     </AppShell>
   );

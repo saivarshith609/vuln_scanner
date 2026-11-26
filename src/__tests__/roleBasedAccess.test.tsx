@@ -46,17 +46,41 @@ describe('strict role-based frontend access', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
-  it('hides administrator navigation and settings from normal users', () => {
-    render(authenticated(normalUser, <Sidebar currentTab="dashboard" onSelectTab={vi.fn()} isCollapsed={false} onToggleCollapse={vi.fn()} />));
+  it('completely hides the Configuration section, Design System, and Tokens badge from normal users and unauthenticated state', () => {
+    const { rerender } = render(authenticated(normalUser, <Sidebar currentTab="dashboard" onSelectTab={vi.fn()} isCollapsed={false} onToggleCollapse={vi.fn()} />));
 
+    expect(screen.queryByText('Configuration')).not.toBeInTheDocument();
     expect(screen.queryByText('Admin Control')).not.toBeInTheDocument();
     expect(screen.queryByText('Settings')).not.toBeInTheDocument();
+    expect(screen.queryByText('Design System')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tokens')).not.toBeInTheDocument();
+    expect(screen.getByText('Operations')).toBeInTheDocument();
+
+    // Also hidden when user is null (loading / unauthenticated)
+    rerender(
+      <AuthContext.Provider value={{ user: null, logout: async () => undefined }}>
+        <Sidebar currentTab="dashboard" onSelectTab={vi.fn()} isCollapsed={false} onToggleCollapse={vi.fn()} />
+      </AuthContext.Provider>,
+    );
+    expect(screen.queryByText('Configuration')).not.toBeInTheDocument();
+    expect(screen.queryByText('Design System')).not.toBeInTheDocument();
   });
 
-  it('shows administrator navigation to administrators', () => {
-    render(authenticated(administrator, <Sidebar currentTab="dashboard" onSelectTab={vi.fn()} isCollapsed={false} onToggleCollapse={vi.fn()} />));
+  it('shows Configuration section, Admin Control, Settings, Design System, and Tokens to administrators and updates on role switch', () => {
+    const { rerender } = render(authenticated(administrator, <Sidebar currentTab="dashboard" onSelectTab={vi.fn()} isCollapsed={false} onToggleCollapse={vi.fn()} />));
 
+    expect(screen.getByText('Configuration')).toBeInTheDocument();
     expect(screen.getByText('Admin Control')).toBeInTheDocument();
     expect(screen.getByText('Settings')).toBeInTheDocument();
+    expect(screen.getByText('Design System')).toBeInTheDocument();
+    expect(screen.getByText('Tokens')).toBeInTheDocument();
+
+    // Switching to normal user hides the entire Configuration section immediately
+    rerender(authenticated(normalUser, <Sidebar currentTab="dashboard" onSelectTab={vi.fn()} isCollapsed={false} onToggleCollapse={vi.fn()} />));
+    expect(screen.queryByText('Configuration')).not.toBeInTheDocument();
+    expect(screen.queryByText('Admin Control')).not.toBeInTheDocument();
+    expect(screen.queryByText('Settings')).not.toBeInTheDocument();
+    expect(screen.queryByText('Design System')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tokens')).not.toBeInTheDocument();
   });
 });
