@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, deleteScan, getAssets, getScans } from '../services/api';
+import { ApiError, deleteScan, getAssets, getScans, resolveApiBaseUrl } from '../services/api';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -85,5 +85,13 @@ describe('Phase 12: API service boundary', () => {
       status: 200,
       message: 'The API returned an invalid JSON response.',
     } satisfies Partial<ApiError>);
+  });
+
+  it('uses localhost fallback only in non-production and requires VITE_API_BASE_URL in production', () => {
+    expect(resolveApiBaseUrl({ configuredUrl: undefined, isProduction: false })).toBe('http://localhost:8000/api/v1');
+    expect(resolveApiBaseUrl({ configuredUrl: '', isProduction: false })).toBe('http://localhost:8000/api/v1');
+    expect(resolveApiBaseUrl({ configuredUrl: undefined, isProduction: true })).toBe('');
+    expect(resolveApiBaseUrl({ configuredUrl: '   ', isProduction: true })).toBe('');
+    expect(resolveApiBaseUrl({ configuredUrl: 'https://api.example.com/api/v1///', isProduction: true })).toBe('https://api.example.com/api/v1');
   });
 });

@@ -27,9 +27,29 @@ import type {
   DiscoveryRun,
   DiscoveredHost,
 } from '../types';
-// Local browser sessions use SameSite=Strict cookies, so the fallback API host
+const LOCAL_DEV_API_BASE_URL = 'http://localhost:8000/api/v1';
+
+/**
+ * Resolve the FastAPI base URL. Localhost fallback is restricted to local
+ * development and test environments so production builds never target localhost.
+ */
+export function resolveApiBaseUrl(options?: {
+  configuredUrl?: string;
+  isProduction?: boolean;
+}): string {
+  const configuredUrl = options && 'configuredUrl' in options
+    ? options.configuredUrl
+    : import.meta.env.VITE_API_BASE_URL;
+  const isProduction = options?.isProduction ?? (import.meta.env.PROD && import.meta.env.MODE !== 'test');
+  const trimmed = typeof configuredUrl === 'string' ? configuredUrl.trim().replace(/\/+$/, '') : '';
+  if (trimmed) return trimmed;
+  if (isProduction) return '';
+  return LOCAL_DEV_API_BASE_URL;
+}
+
+// Local browser sessions use SameSite=Strict cookies, so the dev fallback host
 // must use the same hostname as Vite's http://localhost:5173 origin.
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+export const API_BASE_URL = resolveApiBaseUrl();
 
 export class ApiError extends Error {
   status: number;
@@ -78,6 +98,12 @@ async function request<T>(
   options: RequestInit = {},
   allowCsrfRecovery = true,
 ): Promise<T | null> {
+  if (!API_BASE_URL) {
+    throw new ApiError(
+      'API base URL is not configured. Set VITE_API_BASE_URL to your FastAPI backend URL.',
+      0,
+    );
+  }
   const url = `${API_BASE_URL}${endpoint}`;
   const method = (options.method || 'GET').toUpperCase();
   const csrfRequired = requiresCsrfToken(endpoint, method);
