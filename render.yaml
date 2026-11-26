@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: vulnscanner-frontend
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: /api/v1
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://vulnscanner-backend-9eyv.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
