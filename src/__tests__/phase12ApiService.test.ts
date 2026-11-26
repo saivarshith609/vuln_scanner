@@ -93,5 +93,6 @@ describe('Phase 12: API service boundary', () => {
     expect(resolveApiBaseUrl({ configuredUrl: undefined, isProduction: true })).toBe('');
     expect(resolveApiBaseUrl({ configuredUrl: '   ', isProduction: true })).toBe('');
     expect(resolveApiBaseUrl({ configuredUrl: 'https://api.example.com/api/v1///', isProduction: true })).toBe('https://api.example.com/api/v1');
+    expect(resolveApiBaseUrl({ configuredUrl: '/api/v1/', isProduction: true })).toBe('/api/v1');
   });
 });
