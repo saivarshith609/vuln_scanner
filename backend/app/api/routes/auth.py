@@ -67,7 +67,7 @@ def _authenticate_user_credentials(
     administrator_only = required_role == "admin"
     login_scope = "administrator" if administrator_only else "account"
     user = db.scalar(
-        select(User).where(or_(User.username == payload.identifier, User.email == payload.identifier))
+        select(User).where(or_(User.username == payload.identifier, User.email == payload.identifier.lower()))
     )
     if user is None or not verify_password(payload.password, user.password_hash):
         add_audit_event(

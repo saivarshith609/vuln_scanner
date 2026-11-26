@@ -86,8 +86,8 @@ def test_initial_admin_cli_creates_one_hashed_audited_database_administrator(
     capsys: pytest.CaptureFixture[str],
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    password = "Initial!Administrator42"
-    answers = iter(["Security Administrator", "Security.Admin", "ADMIN@EXAMPLE.TEST", "CREATE"])
+    password = "Initial!Admin42"
+    answers = iter(["Security Administrator", "Security.Admin1", "ADMIN@EXAMPLE.TEST", "CREATE"])
     password_answers = iter([password, password])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
     monkeypatch.setattr("getpass.getpass", lambda _prompt: next(password_answers))
@@ -97,7 +97,7 @@ def test_initial_admin_cli_creates_one_hashed_audited_database_administrator(
     cli_main()
 
     output = capsys.readouterr().out
-    administrator = db_session.scalar(select(User).where(User.username == "security.admin"))
+    administrator = db_session.scalar(select(User).where(User.username == "Security.Admin1"))
     assert administrator is not None
     assert administrator.email == "admin@example.test"
     assert administrator.role == "admin"
@@ -113,7 +113,7 @@ def test_initial_admin_cli_creates_one_hashed_audited_database_administrator(
 
     login = client.post(
         "/api/v1/auth/admin/login",
-        json={"identifier": "SECURITY.ADMIN", "password": password},
+        json={"identifier": "Security.Admin1", "password": password},
     )
     assert login.status_code == 200
     assert login.json()["user"]["id"] == str(administrator.id)
@@ -127,9 +127,9 @@ def test_initial_admin_provisioning_rejects_duplicate_identity_and_second_cli_us
 ) -> None:
     existing = User(
         full_name="Existing User",
-        username="existing",
+        username="Existing_1",
         email="existing@example.test",
-        password_hash=hash_password("Existing!Password42"),
+        password_hash=hash_password("Existing!Pass42"),
         role="user",
         is_active=True,
     )
@@ -140,17 +140,17 @@ def test_initial_admin_provisioning_rejects_duplicate_identity_and_second_cli_us
         create_initial_administrator(
             db_session,
             full_name="Duplicate Username",
-            username="existing",
+            username="Existing_1",
             email="unique@example.test",
-            password="Initial!Administrator42",
+            password="Initial!Admin42",
         )
     with pytest.raises(RuntimeError, match="email already exists"):
         create_initial_administrator(
             db_session,
             full_name="Duplicate Email",
-            username="unique-admin",
+            username="Unique-Admin1",
             email="existing@example.test",
-            password="Initial!Administrator42",
+            password="Initial!Admin42",
         )
 
     existing.role = "admin"
@@ -159,9 +159,9 @@ def test_initial_admin_provisioning_rejects_duplicate_identity_and_second_cli_us
     dedicated = create_initial_administrator(
         db_session,
         full_name="Dedicated Administrator",
-        username="dedicated-admin",
+        username="Dedicated-Admin1",
         email="dedicated@example.test",
-        password="Initial!Administrator42",
+        password="Initial!Admin42",
     )
     db_session.refresh(existing)
     assert dedicated.role == "admin"
@@ -172,9 +172,9 @@ def test_initial_admin_provisioning_rejects_duplicate_identity_and_second_cli_us
         create_initial_administrator(
             db_session,
             full_name="Another Administrator",
-            username="another-admin",
+            username="Another-Admin1",
             email="another@example.test",
-            password="Initial!Administrator42",
+            password="Initial!Admin42",
         )
 
 
@@ -217,9 +217,9 @@ def test_local_admin_password_reset_preserves_identity_revokes_sessions_and_audi
 
     reset = reset_administrator_password(
         db_session,
-        identifier="DATABASE_ADMIN",
-        password="New!Administrator42",
-        confirmation="New!Administrator42",
+        identifier="ADMIN@EXAMPLE.TEST",
+        password="New!Admin42",
+        confirmation="New!Admin42",
     )
 
     assert reset.id == administrator.id
@@ -232,7 +232,7 @@ def test_local_admin_password_reset_preserves_identity_revokes_sessions_and_audi
     assert administrator.password_change_required is False
     assert administrator.version == 5
     assert administrator.password_hash != old_hash
-    assert verify_password("New!Administrator42", administrator.password_hash)
+    assert verify_password("New!Admin42", administrator.password_hash)
     assert not verify_password("Old!Password42", administrator.password_hash)
     db_session.refresh(operator_session)
     assert operator_session.revoked_at is not None
@@ -247,9 +247,10 @@ def test_local_admin_password_reset_preserves_identity_revokes_sessions_and_audi
 @pytest.mark.parametrize(
     ("password", "confirmation", "error"),
     [
-        ("weak", "weak", "between 6 and 128"),
-        ("Ab1!x", "Ab1!x", "between 6 and 128"),
-        ("New!Administrator42", "Different!Administrator42", "confirmation does not match"),
+        ("weak", "weak", "between 6 and 20"),
+        ("Ab1!x", "Ab1!x", "between 6 and 20"),
+        ("Abcdefghij123456789!x", "Abcdefghij123456789!x", "between 6 and 20"),
+        ("New!Admin42", "Different!Admin42", "confirmation does not match"),
     ],
 )
 def test_local_admin_password_reset_rejects_invalid_password_input(
@@ -325,11 +326,11 @@ def test_local_admin_password_reset_cli_updates_only_target_password(
     db_session.commit()
     administrator_id = administrator.id
     answers = iter(["RESET database_admin"])
-    password_answers = iter(["New!Administrator42", "New!Administrator42"])
+    password_answers = iter(["New!Admin42", "New!Admin42"])
     monkeypatch.setattr("app.cli.get_session_factory", lambda: lambda: db_session)
     monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
     monkeypatch.setattr("getpass.getpass", lambda _prompt: next(password_answers))
-    monkeypatch.setattr(sys, "argv", ["vuln", "reset-admin-password", "--identifier", "DATABASE_ADMIN"])
+    monkeypatch.setattr(sys, "argv", ["vuln", "reset-admin-password", "--identifier", "database_admin"])
 
     cli_main()
 
@@ -337,10 +338,10 @@ def test_local_admin_password_reset_cli_updates_only_target_password(
     assert stored is not None
     assert stored.id == administrator_id
     assert stored.role == "admin"
-    assert verify_password("New!Administrator42", stored.password_hash)
+    assert verify_password("New!Admin42", stored.password_hash)
     output = capsys.readouterr().out
-    assert "New!Administrator42" not in output
-    assert "New!Administrator42" not in caplog.text
+    assert "New!Admin42" not in output
+    assert "New!Admin42" not in caplog.text
     assert stored.password_hash not in caplog.text
 
 

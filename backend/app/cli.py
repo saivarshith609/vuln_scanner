@@ -100,8 +100,8 @@ def reset_administrator_password(
     confirmation: str,
 ) -> User:
     """Reset one existing database administrator through the trusted local CLI."""
-    normalized_identifier = identifier.strip().lower()
-    if not normalized_identifier:
+    cleaned_identifier = identifier.strip()
+    if not cleaned_identifier:
         raise ValueError("An administrator username or email is required.")
     if password != confirmation:
         raise ValueError("Password confirmation does not match.")
@@ -109,7 +109,7 @@ def reset_administrator_password(
 
     user = db.scalar(
         select(User)
-        .where(or_(User.username == normalized_identifier, User.email == normalized_identifier))
+        .where(or_(User.username == cleaned_identifier, User.email == cleaned_identifier.lower()))
         .with_for_update()
     )
     if user is None:
@@ -209,7 +209,7 @@ def create_admin_command() -> None:
     print("Create a dedicated VulnScanner database administrator.")
     print("This one-time bootstrap refuses to run after it has successfully created an account.")
     full_name = input("Full name: ").strip()
-    username = input("Username: ").strip()
+    username = input("Username: ")
     email = input("Email: ").strip()
     password = getpass.getpass("Password: ")
     confirmation = getpass.getpass("Confirm password: ")
@@ -217,7 +217,7 @@ def create_admin_command() -> None:
         print("Administrator was not created: password confirmation does not match.")
         return
 
-    print(f"Requested administrator: {username.strip().lower()} ({email.strip().lower()})")
+    print(f"Requested administrator: {username} ({email.strip().lower()})")
     if input("Type CREATE to continue: ").strip() != "CREATE":
         print("Administrator creation cancelled; no database changes were made.")
         return
@@ -243,9 +243,9 @@ def create_admin_command() -> None:
 
 def reset_admin_password_command(identifier: str) -> None:
     """Interactively replace one existing administrator's password."""
-    normalized_identifier = identifier.strip().lower()
-    confirmation_token = f"RESET {normalized_identifier}"
-    print(f"This will replace the password for administrator identifier: {normalized_identifier}")
+    cleaned_identifier = identifier.strip()
+    confirmation_token = f"RESET {cleaned_identifier}"
+    print(f"This will replace the password for administrator identifier: {cleaned_identifier}")
     print("The account, role, owned data, and audit history will be preserved.")
     if input(f"Type {confirmation_token} to continue: ").strip() != confirmation_token:
         print("Administrator password reset cancelled; no database changes were made.")
@@ -258,7 +258,7 @@ def reset_admin_password_command(identifier: str) -> None:
         try:
             user = reset_administrator_password(
                 db,
-                identifier=normalized_identifier,
+                identifier=cleaned_identifier,
                 password=password,
                 confirmation=password_confirmation,
             )

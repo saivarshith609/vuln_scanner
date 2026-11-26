@@ -117,7 +117,7 @@ def test_admin_overview_and_user_search_use_persisted_data(client: TestClient, d
 def test_admin_edit_uses_versioning_and_rejects_duplicates(client: TestClient, db_session: Session) -> None:
     make_user(db_session, "rootadmin", "admin")
     target = make_user(db_session, "analyst")
-    make_user(db_session, "existing")
+    make_user(db_session, "Existing_1")
     headers = login(client, "rootadmin", administrator=True)
     response = client.patch(f"/api/v1/admin/users/{target.id}", headers=headers, json={
         "version": target.version, "full_name": "Updated Analyst", "email": "updated@example.test",
@@ -126,7 +126,7 @@ def test_admin_edit_uses_versioning_and_rejects_duplicates(client: TestClient, d
     assert response.json()["version"] == 2
     stale = client.patch(f"/api/v1/admin/users/{target.id}", headers=headers, json={"version": 1, "full_name": "Stale"})
     assert stale.status_code == 409
-    duplicate = client.patch(f"/api/v1/admin/users/{target.id}", headers=headers, json={"version": 2, "username": "existing"})
+    duplicate = client.patch(f"/api/v1/admin/users/{target.id}", headers=headers, json={"version": 2, "username": "Existing_1"})
     assert duplicate.status_code == 409
 
 

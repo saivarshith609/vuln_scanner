@@ -269,8 +269,8 @@ describe('Phase 15 authentication UI regression', () => {
     expect(await screen.findByText('Change temporary password')).toBeInTheDocument();
     expect(screen.queryByText('Protected operations')).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Temporary password'), 'Temporary!Secret456');
-    await user.type(screen.getByLabelText('New password'), 'Replacement!Secret789');
-    await user.type(screen.getByLabelText('Confirm new password'), 'Replacement!Secret789');
+    await user.type(screen.getByLabelText('New password'), 'Replace!Secret78');
+    await user.type(screen.getByLabelText('Confirm new password'), 'Replace!Secret78');
     await user.click(screen.getByRole('button', { name: 'Change password' }));
     await waitFor(() => expect(authApi.changePassword).toHaveBeenCalled());
     expect(await screen.findByText('Administrator sign in')).toBeInTheDocument();

@@ -42,6 +42,12 @@ import {
 } from '../services/api';
 import { exportReportPdf } from '../services/pdfExport';
 import { downloadScanReportPdf } from '../services/scanReportPdf';
+import {
+  PASSWORD_REQUIREMENTS_TEXT,
+  USERNAME_REQUIREMENTS_TEXT,
+  validatePasswordPolicy,
+  validateUsernamePolicy,
+} from '../utils/authValidation';
 import type { DiscoveredHost, Report } from '../types';
 import './AdminPage.css';
 
@@ -144,14 +150,31 @@ function EditUserModal({ user, open, onClose, onSaved }: { user: AdminUser; open
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => setForm({ full_name: user.full_name, username: user.username, email: user.email, role: user.role, is_active: user.is_active }), [user]);
-  const save = async () => { if ((form.role !== user.role || form.is_active !== user.is_active) && !window.confirm('This sensitive change will revoke the user’s active sessions. Continue?')) return; setBusy(true); setError(null); try { await updateAdminUser(user.id, { ...form, version: user.version }); onSaved(); } catch (err) { setError(err instanceof Error ? err.message : 'Update failed.'); } finally { setBusy(false); } };
-  return <Modal isOpen={open} onClose={onClose} title="Edit user" footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" isLoading={busy} onClick={() => void save()}>Save changes</Button></>}><div className="vs-admin-form"><Input label="Full name" value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} /><Input label="Username" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} /><Input label="Email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /><label>Role<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as 'user' | 'admin' })}><option value="user">User</option><option value="admin">Administrator</option></select></label><label className="vs-admin-checkbox"><input type="checkbox" checked={form.is_active} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} /> Account enabled</label>{error && <div className="vs-admin-error" role="alert">{error}</div>}</div></Modal>;
+  const save = async () => {
+    if (form.username !== user.username) {
+      const usernameError = validateUsernamePolicy(form.username);
+      if (usernameError) { setError(usernameError); return; }
+    }
+    if ((form.role !== user.role || form.is_active !== user.is_active) && !window.confirm('This sensitive change will revoke the user’s active sessions. Continue?')) return;
+    setBusy(true); setError(null);
+    try { await updateAdminUser(user.id, { ...form, version: user.version }); onSaved(); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Update failed.'); }
+    finally { setBusy(false); }
+  };
+  return <Modal isOpen={open} onClose={onClose} title="Edit user" footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="primary" isLoading={busy} onClick={() => void save()}>Save changes</Button></>}><div className="vs-admin-form"><Input label="Full name" value={form.full_name} onChange={(event) => setForm({ ...form, full_name: event.target.value })} /><Input label="Username" value={form.username} helperText={USERNAME_REQUIREMENTS_TEXT} onChange={(event) => { setForm({ ...form, username: event.target.value }); setError(null); }} /><Input label="Email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /><label>Role<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value as 'user' | 'admin' })}><option value="user">User</option><option value="admin">Administrator</option></select></label><label className="vs-admin-checkbox"><input type="checkbox" checked={form.is_active} onChange={(event) => setForm({ ...form, is_active: event.target.checked })} /> Account enabled</label>{error && <div className="vs-admin-error" role="alert">{error}</div>}</div></Modal>;
 }
 
 function ResetPasswordModal({ user, open, onClose, onSaved }: { user: AdminUser; open: boolean; onClose: () => void; onSaved: () => void }) {
   const [password, setPassword] = useState(''); const [confirm, setConfirm] = useState(''); const [error, setError] = useState<string | null>(null); const [busy, setBusy] = useState(false);
-  const save = async () => { setBusy(true); setError(null); try { await resetAdminUserPassword(user.id, password, confirm); setPassword(''); setConfirm(''); onSaved(); } catch (err) { setError(err instanceof Error ? err.message : 'Reset failed.'); } finally { setBusy(false); } };
-  return <Modal isOpen={open} onClose={onClose} title={`Reset password for @${user.username}`} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="danger" isLoading={busy} disabled={!password || password !== confirm} onClick={() => void save()}>Reset & revoke sessions</Button></>}><div className="vs-admin-form"><p>The temporary password is hashed immediately, never logged, and must be changed after the next login.</p><Input label="Temporary password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} /><Input label="Confirm temporary password" type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} error={confirm && password !== confirm ? 'Passwords do not match.' : undefined} />{error && <div className="vs-admin-error" role="alert">{error}</div>}</div></Modal>;
+  const save = async () => {
+    const policyError = validatePasswordPolicy(password);
+    if (policyError) { setError(policyError); return; }
+    setBusy(true); setError(null);
+    try { await resetAdminUserPassword(user.id, password, confirm); setPassword(''); setConfirm(''); onSaved(); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Reset failed.'); }
+    finally { setBusy(false); }
+  };
+  return <Modal isOpen={open} onClose={onClose} title={`Reset password for @${user.username}`} footer={<><Button variant="ghost" onClick={onClose}>Cancel</Button><Button variant="danger" isLoading={busy} disabled={!password || password !== confirm} onClick={() => void save()}>Reset & revoke sessions</Button></>}><div className="vs-admin-form"><p>The temporary password is hashed immediately, never logged, and must be changed after the next login.</p><Input label="Temporary password" type="password" value={password} helperText={PASSWORD_REQUIREMENTS_TEXT} onChange={(event) => { setPassword(event.target.value); setError(null); }} /><Input label="Confirm temporary password" type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} error={confirm && password !== confirm ? 'Passwords do not match.' : undefined} />{error && <div className="vs-admin-error" role="alert">{error}</div>}</div></Modal>;
 }
 
 function ScanTable({ scans, onChanged }: { scans: AdminScan[]; onChanged?: () => void }) {

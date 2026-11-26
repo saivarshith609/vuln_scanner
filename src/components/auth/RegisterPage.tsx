@@ -3,6 +3,12 @@ import { Eye, EyeOff, ShieldCheck, UserPlus } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import type { RegisterAccountInput } from '../../services/api';
+import {
+  PASSWORD_REQUIREMENTS_TEXT,
+  USERNAME_REQUIREMENTS_TEXT,
+  validatePasswordPolicy,
+  validateUsernamePolicy,
+} from '../../utils/authValidation';
 
 interface RegisterPageProps {
   onSubmit: (payload: RegisterAccountInput) => Promise<void>;
@@ -18,17 +24,11 @@ export function RegisterPage({ onSubmit, onLogin, error, isSubmitting }: Registe
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    const usernameError = validateUsernamePolicy(form.username);
+    if (usernameError) return setValidation(usernameError);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setValidation('Enter a valid email address.');
-    if (
-      form.password.length < 6
-      || form.password.length > 128
-      || !/[A-Z]/.test(form.password)
-      || !/[a-z]/.test(form.password)
-      || !/\d/.test(form.password)
-      || !/[^A-Za-z0-9]/.test(form.password)
-    ) {
-      return setValidation('Password must be 6-128 characters and include uppercase, lowercase, a number, and a special character.');
-    }
+    const passwordError = validatePasswordPolicy(form.password);
+    if (passwordError) return setValidation(passwordError);
     if (form.password !== form.confirm_password) return setValidation('Password confirmation does not match.');
     setValidation(null);
     void onSubmit(form);
@@ -46,10 +46,10 @@ export function RegisterPage({ onSubmit, onLogin, error, isSubmitting }: Registe
         <p>Accounts are stored persistently and receive standard-user access. Administrator privileges cannot be requested here.</p>
         {(validation || error) && <div className="vs-auth-message vs-auth-message--error" role="alert">{validation || error}</div>}
         <form className="vs-auth-form" onSubmit={submit}>
-          <div className="vs-auth-grid"><Input label="Full name" value={form.full_name} onChange={update('full_name')} autoComplete="name" required /><Input label="Username" value={form.username} onChange={update('username')} autoComplete="username" helperText="Lowercase letters, numbers, dots, dashes, or underscores." required /></div>
+          <div className="vs-auth-grid"><Input label="Full name" value={form.full_name} onChange={update('full_name')} autoComplete="name" required /><Input label="Username" value={form.username} onChange={update('username')} autoComplete="username" helperText={USERNAME_REQUIREMENTS_TEXT} required /></div>
           <Input label="Email address" type="email" value={form.email} onChange={update('email')} autoComplete="email" required />
           <div className="vs-auth-grid">
-            <Input label="Password" type={showPassword ? 'text' : 'password'} value={form.password} onChange={update('password')} autoComplete="new-password" required rightIcon={<button type="button" className="vs-auth-visibility" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide passwords' : 'Show passwords'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>} />
+            <Input label="Password" type={showPassword ? 'text' : 'password'} value={form.password} onChange={update('password')} autoComplete="new-password" helperText={PASSWORD_REQUIREMENTS_TEXT} required rightIcon={<button type="button" className="vs-auth-visibility" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? 'Hide passwords' : 'Show passwords'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button>} />
             <Input label="Confirm password" type={showPassword ? 'text' : 'password'} value={form.confirm_password} onChange={update('confirm_password')} autoComplete="new-password" required />
           </div>
           <Button type="submit" leftIcon={<UserPlus size={16} />} isLoading={isSubmitting} disabled={isSubmitting}>Create Account</Button>

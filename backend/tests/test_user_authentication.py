@@ -45,11 +45,11 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
         yield test_client
 
 
-def registration_payload(username="alice", email="alice@example.com") -> dict[str, str]:
+def registration_payload(username="Alice_1", email="alice@example.com") -> dict[str, str]:
     return {"full_name": "Alice Operator", "username": username, "email": email, "password": PASSWORD, "confirm_password": PASSWORD}
 
 
-def register_and_login(client: TestClient, db_session: Session, username="alice", email="alice@example.com") -> User:
+def register_and_login(client: TestClient, db_session: Session, username="Alice_1", email="alice@example.com") -> User:
     assert client.post("/api/v1/auth/register", json=registration_payload(username, email)).status_code == 201
     assert client.post("/api/v1/auth/login", json={"identifier": username, "password": PASSWORD}).status_code == 200
     return db_session.scalar(select(User).where(User.username == username))
@@ -78,14 +78,14 @@ def make_database_user(
 
 
 def test_registration_persists_normalized_user_and_argon2id_hash(client: TestClient, db_session: Session) -> None:
-    payload = registration_payload("Alice.User", "Alice@Example.COM") | {"role": "admin"}
+    payload = registration_payload("Alice.User1", "Alice@Example.COM") | {"role": "admin"}
     response = client.post("/api/v1/auth/register", json=payload)
     assert response.status_code == 201
-    assert response.json()["username"] == "alice.user"
+    assert response.json()["username"] == "Alice.User1"
     assert response.json()["email"] == "alice@example.com"
     assert response.json()["role"] == "user"
     assert "password" not in response.text.lower()
-    stored = db_session.scalar(select(User).where(User.username == "alice.user"))
+    stored = db_session.scalar(select(User).where(User.username == "Alice.User1"))
     assert stored is not None
     assert stored.password_hash != PASSWORD
     assert stored.password_hash.startswith("$argon2id$")
@@ -96,7 +96,7 @@ def test_login_by_username_or_email_restores_safe_session(client: TestClient, db
     assert client.post("/api/v1/auth/register", json=registration_payload()).status_code == 201
     login = client.post("/api/v1/auth/login", json={"identifier": "ALICE@EXAMPLE.COM", "password": PASSWORD})
     assert login.status_code == 200
-    assert login.json()["user"]["username"] == "alice"
+    assert login.json()["user"]["username"] == "Alice_1"
     assert "httponly" in login.headers["set-cookie"].lower()
     assert client.cookies.get("vulnscanner_csrf")
     stored_session = db_session.scalar(select(OperatorSession))
@@ -211,33 +211,73 @@ def test_administrator_temporary_password_still_blocks_control_center(
 
 
 @pytest.mark.parametrize("payload", [
-    registration_payload("bad email", "not-an-email"),
+    registration_payload("Alice_1", "not-an-email"),
+    registration_payload("alice_1", "alice@example.com"),   # first char lowercase
+    registration_payload("Ab_1!", "alice@example.com"),     # fewer than 6 chars
+    registration_payload("Alice_!", "alice@example.com"),   # missing number
+    registration_payload("Alice12", "alice@example.com"),   # missing special char
+    registration_payload("Alice 1!", "alice@example.com"),  # contains space
     registration_payload() | {"password": "weak", "confirm_password": "weak"},
     registration_payload() | {"password": "Ab1!x", "confirm_password": "Ab1!x"},
+    registration_payload() | {"password": "Abcdefghij123456789!x", "confirm_password": "Abcdefghij123456789!x"},  # 21 chars
     registration_payload() | {"password": "abcdef1!", "confirm_password": "abcdef1!"},
     registration_payload() | {"password": "ABCDEF1!", "confirm_password": "ABCDEF1!"},
     registration_payload() | {"password": "Abcdef!", "confirm_password": "Abcdef!"},
     registration_payload() | {"password": "Abcdef1", "confirm_password": "Abcdef1"},
+    registration_payload() | {"password": "Abcdef1 ", "confirm_password": "Abcdef1 "},  # space alone is not a special char
     registration_payload() | {"confirm_password": "DifferentPassword!42"},
 ])
 def test_registration_validation_rejects_invalid_input(client: TestClient, payload: dict[str, str]) -> None:
     assert client.post("/api/v1/auth/register", json=payload).status_code == 422
 
 
+@pytest.mark.parametrize("username", ["ALICE_1", "Alice_1", "A1!XYZ"])
+def test_registration_accepts_valid_usernames_including_uppercase_only(client: TestClient, username: str) -> None:
+    resp = client.post("/api/v1/auth/register", json=registration_payload(username, f"{username.lower()}@example.com"))
+    assert resp.status_code == 201
+    assert resp.json()["username"] == username
+
+
+def test_registration_and_login_preserve_spaces_and_boundary_lengths_in_passwords(client: TestClient) -> None:
+    # Exactly 6 chars, 20 chars, and leading/middle/trailing spaces
+    for idx, pwd in enumerate(["Abc1!x", "Abcdefghij12345678!x", " Ab1!x "]):
+        uname = f"User_{idx}!"
+        email = f"user{idx}@example.com"
+        reg = client.post(
+            "/api/v1/auth/register",
+            json=registration_payload(uname, email) | {"password": pwd, "confirm_password": pwd},
+        )
+        assert reg.status_code == 201
+        login = client.post("/api/v1/auth/login", json={"identifier": uname, "password": pwd})
+        assert login.status_code == 200
+        # Trimmed version must NOT match a password with leading/trailing spaces
+        if pwd != pwd.strip():
+            client.cookies.clear()
+            bad_login = client.post("/api/v1/auth/login", json={"identifier": uname, "password": pwd.strip()})
+            assert bad_login.status_code == 401
+
+
+def test_existing_legacy_user_can_still_log_in(client: TestClient, db_session: Session) -> None:
+    make_database_user(db_session, "legacy_user")
+    login = client.post("/api/v1/auth/login", json={"identifier": "legacy_user", "password": PASSWORD})
+    assert login.status_code == 200
+    assert login.json()["user"]["username"] == "legacy_user"
+
+
 def test_registration_and_password_change_accept_six_character_strong_password(client: TestClient) -> None:
     six_char = "Abc1!x"
     reg = client.post(
         "/api/v1/auth/register",
-        json=registration_payload("sixuser", "sixuser@example.com") | {"password": six_char, "confirm_password": six_char},
+        json=registration_payload("SixUser_1", "sixuser@example.com") | {"password": six_char, "confirm_password": six_char},
     )
     assert reg.status_code == 201
-    login = client.post("/api/v1/auth/login", json={"identifier": "sixuser", "password": six_char})
+    login = client.post("/api/v1/auth/login", json={"identifier": "SixUser_1", "password": six_char})
     assert login.status_code == 200
     csrf = client.cookies.get("vulnscanner_csrf")
     changed = client.post(
         "/api/v1/auth/change-password",
         headers={"X-CSRF-Token": csrf or ""},
-        json={"current_password": six_char, "new_password": "Zyx9@w", "confirm_password": "Zyx9@w"},
+        json={"current_password": six_char, "new_password": " Zyx9@w ", "confirm_password": " Zyx9@w "},
     )
     assert changed.status_code == 200
     assert changed.json()["changed"] is True
@@ -245,8 +285,8 @@ def test_registration_and_password_change_accept_six_character_strong_password(c
 
 def test_duplicate_username_and_email_are_rejected(client: TestClient) -> None:
     assert client.post("/api/v1/auth/register", json=registration_payload()).status_code == 201
-    assert client.post("/api/v1/auth/register", json=registration_payload("alice", "other@example.com")).status_code == 409
-    assert client.post("/api/v1/auth/register", json=registration_payload("other", "alice@example.com")).status_code == 409
+    assert client.post("/api/v1/auth/register", json=registration_payload("Alice_1", "other@example.com")).status_code == 409
+    assert client.post("/api/v1/auth/register", json=registration_payload("Other_1", "alice@example.com")).status_code == 409
 
 
 def test_database_unique_constraints_close_registration_race(db_session: Session) -> None:
@@ -270,12 +310,12 @@ def test_database_failure_never_returns_registration_success(client: TestClient,
 
 def test_wrong_password_and_disabled_account_use_generic_failure(client: TestClient, db_session: Session) -> None:
     assert client.post("/api/v1/auth/register", json=registration_payload()).status_code == 201
-    wrong = client.post("/api/v1/auth/login", json={"identifier": "alice", "password": "WrongPassword!42"})
+    wrong = client.post("/api/v1/auth/login", json={"identifier": "Alice_1", "password": "WrongPassword!42"})
     assert wrong.status_code == 401
-    user = db_session.scalar(select(User).where(User.username == "alice"))
+    user = db_session.scalar(select(User).where(User.username == "Alice_1"))
     user.is_active = False
     db_session.commit()
-    disabled = client.post("/api/v1/auth/login", json={"identifier": "alice", "password": PASSWORD})
+    disabled = client.post("/api/v1/auth/login", json={"identifier": "Alice_1", "password": PASSWORD})
     assert disabled.status_code == 401
     assert disabled.json()["detail"] == wrong.json()["detail"]
 
@@ -284,7 +324,7 @@ def test_logout_revokes_session_but_preserves_account(client: TestClient, db_ses
     register_and_login(client, db_session)
     assert client.post("/api/v1/auth/logout", headers={"X-CSRF-Token": client.cookies.get("vulnscanner_csrf")}).status_code == 204
     assert client.get("/api/v1/auth/session").status_code == 401
-    assert db_session.scalar(select(User).where(User.username == "alice")) is not None
+    assert db_session.scalar(select(User).where(User.username == "Alice_1")) is not None
 
 
 def test_cookie_state_changes_require_csrf_token(client: TestClient, db_session: Session) -> None:
@@ -342,7 +382,7 @@ def test_session_rotation_and_logout_invalidate_stale_tokens(client: TestClient,
     old_csrf = client.cookies.get("vulnscanner_csrf")
     assert old_session and old_csrf
 
-    rotated = client.post("/api/v1/auth/login", json={"identifier": "alice", "password": PASSWORD})
+    rotated = client.post("/api/v1/auth/login", json={"identifier": "Alice_1", "password": PASSWORD})
     assert rotated.status_code == 200
     new_session = client.cookies.get("vulnscanner_session")
     new_csrf = client.cookies.get("vulnscanner_csrf")
@@ -430,4 +470,4 @@ def test_registered_account_survives_new_browser_client(db_session: Session) -> 
     with TestClient(app) as first:
         assert first.post("/api/v1/auth/register", json=registration_payload()).status_code == 201
     with TestClient(app) as restarted:
-        assert restarted.post("/api/v1/auth/login", json={"identifier": "alice", "password": PASSWORD}).status_code == 200
+        assert restarted.post("/api/v1/auth/login", json={"identifier": "Alice_1", "password": PASSWORD}).status_code == 200

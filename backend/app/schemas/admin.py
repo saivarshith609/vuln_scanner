@@ -7,13 +7,13 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.schemas.auth import EMAIL_RE, USERNAME_RE, normalize_email, normalize_username, validate_password_policy
+from app.schemas.auth import EMAIL_RE, normalize_email, validate_password_policy, validate_username_policy
 
 
 class AdminUserUpdate(BaseModel):
     version: int = Field(ge=1)
     full_name: str | None = Field(default=None, min_length=2, max_length=255)
-    username: str | None = Field(default=None, min_length=3, max_length=64)
+    username: str | None = Field(default=None, min_length=6, max_length=64)
     email: str | None = Field(default=None, min_length=5, max_length=320)
     role: Literal["user", "admin"] | None = None
     is_active: bool | None = None
@@ -33,10 +33,7 @@ class AdminUserUpdate(BaseModel):
     def clean_username(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        normalized = normalize_username(value)
-        if not USERNAME_RE.fullmatch(normalized):
-            raise ValueError("Username must use 3-64 lowercase letters, numbers, dots, dashes, or underscores.")
-        return normalized
+        return validate_username_policy(value)
 
     @field_validator("email")
     @classmethod

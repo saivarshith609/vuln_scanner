@@ -7,12 +7,25 @@ from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
-USERNAME_RE = re.compile(r"^[a-z0-9][a-z0-9_.-]{2,63}$")
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
+def validate_username_policy(value: str) -> str:
+    if re.search(r"\s", value):
+        raise ValueError("Username cannot contain spaces.")
+    if len(value) < 6 or len(value) > 64:
+        raise ValueError("Username must be between 6 and 64 characters.")
+    if not re.match(r"^[A-Z]", value):
+        raise ValueError("Username must start with an uppercase letter (A-Z).")
+    if not re.search(r"[0-9]", value):
+        raise ValueError("Username must contain at least one number (0-9).")
+    if not re.search(r"[^A-Za-z0-9\s]", value):
+        raise ValueError("Username must contain at least one special character.")
+    return value
+
+
 def normalize_username(value: str) -> str:
-    return value.strip().lower()
+    return validate_username_policy(value)
 
 
 def normalize_email(value: str) -> str:
@@ -20,12 +33,16 @@ def normalize_email(value: str) -> str:
 
 
 def validate_password_policy(value: str) -> str:
-    if len(value) < 6 or len(value) > 128:
-        raise ValueError("Password must be between 6 and 128 characters.")
-    if not re.search(r"[a-z]", value) or not re.search(r"[A-Z]", value):
-        raise ValueError("Password must contain uppercase and lowercase letters.")
-    if not re.search(r"\d", value) or not re.search(r"[^A-Za-z0-9]", value):
-        raise ValueError("Password must contain a number and a special character.")
+    if len(value) < 6 or len(value) > 20:
+        raise ValueError("Password must be between 6 and 20 characters.")
+    if not re.search(r"[A-Z]", value):
+        raise ValueError("Password must contain at least one uppercase letter.")
+    if not re.search(r"[a-z]", value):
+        raise ValueError("Password must contain at least one lowercase letter.")
+    if not re.search(r"[0-9]", value):
+        raise ValueError("Password must contain at least one number.")
+    if not re.search(r"[^A-Za-z0-9\s]", value):
+        raise ValueError("Password must contain at least one special character.")
     return value
 
 
@@ -42,7 +59,7 @@ class UserResponse(BaseModel):
 
 class RegisterRequest(BaseModel):
     full_name: str = Field(min_length=2, max_length=255)
-    username: str = Field(min_length=3, max_length=64)
+    username: str = Field(min_length=6, max_length=64)
     email: str = Field(min_length=5, max_length=320)
     password: str
     confirm_password: str
@@ -58,10 +75,7 @@ class RegisterRequest(BaseModel):
     @field_validator("username")
     @classmethod
     def clean_username(cls, value: str) -> str:
-        normalized = normalize_username(value)
-        if not USERNAME_RE.fullmatch(normalized):
-            raise ValueError("Username must use 3-64 lowercase letters, numbers, dots, dashes, or underscores.")
-        return normalized
+        return validate_username_policy(value)
 
     @field_validator("email")
     @classmethod
@@ -90,7 +104,7 @@ class LoginRequest(BaseModel):
     @field_validator("identifier")
     @classmethod
     def clean_identifier(cls, value: str) -> str:
-        return value.strip().lower()
+        return value.strip()
 
 
 class SessionResponse(BaseModel):
