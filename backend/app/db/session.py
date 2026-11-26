@@ -24,11 +24,15 @@ def _init_engine() -> None:
     if _engine is not None:
         return
     settings = get_settings()
+    connect_args: dict[str, Any] = {}
+    if settings.DATABASE_URL.startswith("postgresql+psycopg"):
+        connect_args["prepare_threshold"] = None
     _engine = create_engine(
         settings.DATABASE_URL,
         pool_pre_ping=True,
         echo=(settings.APP_ENV == "development"),
         hide_parameters=True,
+        connect_args=connect_args,
     )
     _SessionLocal = sessionmaker(bind=_engine, autocommit=False, autoflush=False)
 
@@ -52,5 +56,8 @@ def get_db() -> Generator[Session, None, None]:
     db = factory()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

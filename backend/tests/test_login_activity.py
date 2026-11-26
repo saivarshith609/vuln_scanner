@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -14,6 +15,7 @@ from app.core.user_agent import parse_user_agent
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import create_app
+from app.models.audit_log import AuditLog
 from app.models.login_activity import LoginActivity
 from app.models.user import User
 
@@ -181,3 +183,61 @@ def test_login_records_success_failure_and_admin_activity_with_rbac(client: Test
     assert len(rows) == 4
     assert any(r.user_id == admin_user.id and r.login_status == "success" for r in rows)
     assert all("AppleWebKit" not in repr(r.__dict__) for r in rows)
+
+
+def test_login_succeeds_when_login_activity_table_is_missing(client: TestClient, db_session: Session) -> None:
+    _make_user(db_session, "Alice_2", role="user")
+    _make_user(db_session, "Admin_2", role="admin")
+
+    # Simulate production DB before login_activities migration is applied.
+    LoginActivity.__table__.drop(db_session.get_bind())
+
+    failed_res = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "Alice_2", "password": "WrongPassword!1"},
+    )
+    assert failed_res.status_code == 401
+
+    user_res = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "Alice_2", "password": PASSWORD},
+    )
+    assert user_res.status_code == 200
+    assert user_res.json()["authenticated"] is True
+
+    client.cookies.clear()
+    admin_res = client.post(
+        "/api/v1/auth/admin/login",
+        json={"identifier": "Admin_2", "password": PASSWORD},
+    )
+    assert admin_res.status_code == 200
+    assert admin_res.json()["authenticated"] is True
+
+    audit_events = db_session.scalars(select(AuditLog).order_by(AuditLog.created_at.asc())).all()
+    assert [event.event_type for event in audit_events] == [
+        "auth.login_failed",
+        "auth.login_succeeded",
+        "auth.login_succeeded",
+    ]
+
+
+def test_login_rolls_back_and_returns_503_on_audit_commit_error(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    _make_user(db_session, "Alice_3", role="user")
+
+    def _raise_commit_error() -> None:
+        raise OperationalError("INSERT INTO audit_logs", {}, RuntimeError("simulated db error"))
+
+    monkeypatch.setattr(db_session, "commit", _raise_commit_error)
+
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"identifier": "Alice_3", "password": PASSWORD},
+    )
+    assert res.status_code == 503
+    assert PASSWORD not in caplog.text
+    assert "Database error during account login" in caplog.text

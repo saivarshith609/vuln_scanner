@@ -46,21 +46,43 @@ def _record_login_activity(
     try:
         device = parse_user_agent(request.headers.get("user-agent"))
         cutoff = datetime.now(timezone.utc) - timedelta(days=LOGIN_ACTIVITY_RETENTION_DAYS)
-        db.execute(delete(LoginActivity).where(LoginActivity.attempted_at < cutoff))
-        db.add(
-            LoginActivity(
-                user_id=user_id,
-                attempted_identifier=(attempted_identifier or "")[:320] or None,
-                browser_name=device.browser_name,
-                browser_version=device.browser_version,
-                operating_system=device.operating_system,
-                os_version=device.os_version,
-                device_type=device.device_type,
-                login_status=login_status,
+        with db.begin_nested():
+            db.execute(delete(LoginActivity).where(LoginActivity.attempted_at < cutoff))
+            db.add(
+                LoginActivity(
+                    user_id=user_id,
+                    attempted_identifier=(attempted_identifier or "")[:320] or None,
+                    browser_name=device.browser_name,
+                    browser_version=device.browser_version,
+                    operating_system=device.operating_system,
+                    os_version=device.os_version,
+                    device_type=device.device_type,
+                    login_status=login_status,
+                )
             )
+            db.flush()
+    except Exception as exc:
+        logger.warning(
+            "Unable to record login activity metadata for status=%s (%s)",
+            login_status,
+            type(exc).__name__,
         )
-    except Exception:
-        logger.warning("Unable to record login activity metadata for status=%s", login_status)
+
+
+def _handle_login_db_error(db: Session, exc: SQLAlchemyError, *, login_scope: str) -> None:
+    """Roll back failed login transactions and log safe diagnostics without leaking secrets."""
+    db.rollback()
+    orig_name = type(exc.orig).__name__ if getattr(exc, "orig", None) is not None else "none"
+    logger.exception(
+        "Database error during %s login (exc=%s, orig=%s)",
+        login_scope,
+        type(exc).__name__,
+        orig_name,
+    )
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Authentication service is temporarily unavailable.",
+    ) from None
 
 
 def _safe_user(user: User) -> UserResponse:
@@ -277,17 +299,20 @@ def login(
     current_token: str | None = Cookie(default=None, alias=get_settings().SESSION_COOKIE_NAME),
     db: Session = Depends(get_db),
 ) -> SessionResponse:
-    user = _authenticate_user_credentials(
-        payload,
-        request,
-        db,
-        required_role="user",
-        current_token=current_token,
-        response=response,
-    )
-    return _create_database_session(
-        user, response, request, current_token, db, login_scope="account",
-    )
+    try:
+        user = _authenticate_user_credentials(
+            payload,
+            request,
+            db,
+            required_role="user",
+            current_token=current_token,
+            response=response,
+        )
+        return _create_database_session(
+            user, response, request, current_token, db, login_scope="account",
+        )
+    except SQLAlchemyError as exc:
+        _handle_login_db_error(db, exc, login_scope="account")
 
 
 @router.post("/admin/login", response_model=SessionResponse)
@@ -299,17 +324,20 @@ def admin_login(
     db: Session = Depends(get_db),
 ) -> SessionResponse:
     """Create a normal server-managed session only for an active database administrator."""
-    user = _authenticate_user_credentials(
-        payload,
-        request,
-        db,
-        required_role="admin",
-        current_token=current_token,
-        response=response,
-    )
-    return _create_database_session(
-        user, response, request, current_token, db, login_scope="administrator",
-    )
+    try:
+        user = _authenticate_user_credentials(
+            payload,
+            request,
+            db,
+            required_role="admin",
+            current_token=current_token,
+            response=response,
+        )
+        return _create_database_session(
+            user, response, request, current_token, db, login_scope="administrator",
+        )
+    except SQLAlchemyError as exc:
+        _handle_login_db_error(db, exc, login_scope="administrator")
 
 
 @router.post("/session", response_model=SessionResponse)
