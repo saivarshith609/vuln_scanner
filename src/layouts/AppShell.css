@@ -1,0 +1,183 @@
+/* Authenticated application shell */
+.vs-app-shell {
+  --sidebar-rail-width: 68px;
+  width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
+}
+
+.vs-app-shell__main {
+  width: 100%;
+  padding-left: var(--sidebar-rail-width);
+  min-width: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-bg-base);
+}
+
+@media (max-width: 768px) {
+  .vs-app-shell__main {
+    padding-left: 0;
+  }
+}
+
+.vs-app-shell__content {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  scrollbar-gutter: stable;
+}
+
+/* Shared surfaces deliberately stay flat and quiet. */
+.vs-app-shell .vs-card,
+.vs-app-shell .vs-stat-card {
+  background: var(--color-bg-card);
+  border-color: var(--color-border);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.vs-app-shell .vs-card__header,
+.vs-app-shell .vs-card__footer {
+  border-color: var(--color-border);
+  background: transparent;
+}
+
+/* New Scan modal */
+.new-scan-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.scan-target-mode {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.scan-target-mode__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.scan-target-mode__button,
+.scan-type-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+
+.scan-target-mode__button {
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.scan-target-mode__button:hover,
+.scan-type-card:hover {
+  border-color: var(--color-border-light);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-primary);
+}
+
+.scan-target-mode__button--selected,
+.scan-type-card--selected {
+  border-color: rgba(91, 156, 246, 0.6);
+  background: var(--color-brand-subtle);
+  color: var(--color-text-primary);
+}
+
+.scan-range-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.scan-profile-note {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.scan-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.scan-type-card {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.scan-type-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.scan-type-card__title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.scan-type-card__desc {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+}
+
+.scan-authorization-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.scan-authorization-confirmation input {
+  margin-top: 2px;
+  accent-color: var(--color-brand);
+}
+
+@media (max-width: 640px) {
+  .scan-target-mode__grid,
+  .scan-range-inputs {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Page-level legacy accents inherit the same flat surface treatment. */
+.vs-app-shell .vs-discovery-hero,
+.vs-app-shell .vs-scan-report__hero {
+  background: var(--color-bg-card);
+}
+
+.vs-app-shell .vs-progress-bar__fill {
+  box-shadow: none;
+}

@@ -1,0 +1,134 @@
+.vs-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(6, 9, 14, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-4);
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.vs-modal-container {
+  background-color: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.62);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
+  width: 100%;
+  animation: modalScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.vs-modal--sm {
+  max-width: 440px;
+}
+.vs-modal--md {
+  max-width: 580px;
+}
+.vs-modal--lg {
+  max-width: 760px;
+}
+.vs-modal--xl {
+  max-width: 960px;
+}
+
+.vs-modal__header {
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vs-modal__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.vs-modal__close-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s, color 0.2s;
+}
+
+.vs-modal__close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-primary);
+  transform: rotate(90deg);
+}
+
+.vs-modal__close-btn:active {
+  transform: rotate(90deg) scale(0.9);
+}
+
+.vs-modal__body {
+  padding: var(--space-6);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.vs-modal__footer {
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-border);
+  background-color: rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (max-width: 600px) {
+  .vs-modal-backdrop {
+    padding: var(--space-2);
+  }
+
+  .vs-modal-container {
+    max-height: 95vh;
+    border-radius: var(--radius-lg);
+  }
+
+  .vs-modal__header {
+    padding: var(--space-4);
+  }
+
+  .vs-modal__body {
+    padding: var(--space-4);
+  }
+
+  .vs-modal__footer {
+    padding: var(--space-3) var(--space-4);
+    flex-wrap: wrap;
+  }
+}

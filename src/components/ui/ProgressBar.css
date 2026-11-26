@@ -1,0 +1,100 @@
+.vs-progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+}
+
+.vs-progress__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.vs-progress__track {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.vs-progress__track--sm {
+  height: 4px;
+}
+.vs-progress__track--md {
+  height: 8px;
+}
+.vs-progress__track--lg {
+  height: 12px;
+}
+
+.vs-progress__fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+/* Variant colors */
+.vs-progress__fill--primary {
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.4);
+}
+
+.vs-progress__fill--critical {
+  background: linear-gradient(90deg, #dc2626, #ef4444);
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.4);
+}
+
+.vs-progress__fill--high {
+  background: linear-gradient(90deg, #ea580c, #f97316);
+  box-shadow: 0 0 10px rgba(249, 115, 22, 0.4);
+}
+
+.vs-progress__fill--medium {
+  background: linear-gradient(90deg, #ca8a04, #eab308);
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.4);
+}
+
+.vs-progress__fill--low {
+  background: linear-gradient(90deg, #16a34a, #22c55e);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.4);
+}
+
+.vs-progress__fill--gradient {
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899);
+}
+
+/* Animated striped bar when active */
+.vs-progress__fill--animated::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 20px 20px;
+  animation: shimmerProgress 1s linear infinite;
+}
+
+@keyframes shimmerProgress {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 20px 0;
+  }
+}

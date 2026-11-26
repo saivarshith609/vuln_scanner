@@ -1,0 +1,259 @@
+/* ==========================================================================
+   VulnScan — Settings Page Responsive Styles
+   ========================================================================== */
+
+.vs-settings-container {
+  padding: clamp(16px, 3vw, 24px);
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.vs-settings-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.vs-settings-tabs {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vs-settings-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-align: left;
+  transition: all var(--transition-fast);
+  width: 100%;
+  white-space: nowrap;
+}
+
+.vs-settings-tab-btn--active {
+  color: var(--color-brand-light);
+  background: var(--color-brand-subtle);
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.vs-settings-heading {
+  margin-bottom: 28px;
+}
+
+.vs-settings-heading h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.vs-settings-heading p,
+.vs-settings-section-title p,
+.vs-settings-row__description {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.vs-settings-heading p {
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.vs-settings-section-title {
+  margin-bottom: 20px;
+}
+
+.vs-settings-section-title h3 {
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.vs-settings-section-title p,
+.vs-settings-row__description {
+  margin-top: 3px;
+}
+
+.vs-settings-row__title {
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.vs-settings-row__control > .vs-input-group {
+  width: 180px;
+}
+
+.vs-settings-row select {
+  min-width: 180px;
+  padding: 9px 12px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.vs-settings-secret-control,
+.vs-settings-color-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vs-settings-secret-control .vs-input-group {
+  width: min(300px, 40vw);
+}
+
+.vs-settings-color-control input {
+  width: 42px;
+  height: 36px;
+  padding: 2px;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.vs-settings-notice {
+  margin-top: 16px;
+  padding: 12px 14px;
+  color: #93c5fd;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.24);
+  border-radius: 10px;
+}
+
+.vs-settings-notice--warning {
+  color: #fde68a;
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.vs-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+.vs-settings-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.vs-settings-status-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.vs-settings-status-grid span {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.vs-settings-status-grid strong {
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+}
+
+.vs-settings-modal-copy {
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.vs-settings-panel {
+  flex: 1;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: clamp(16px, 4vw, 28px);
+  min-width: 0;
+  width: 100%;
+}
+
+.vs-settings-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.vs-settings-row__label {
+  flex: 1;
+  min-width: 200px;
+}
+
+.vs-settings-row__control {
+  flex-shrink: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .vs-settings-layout {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .vs-settings-tabs {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .vs-settings-tab-btn {
+    width: auto;
+    flex-shrink: 0;
+    padding: 8px 12px;
+  }
+
+  .vs-settings-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .vs-settings-row__control {
+    width: 100%;
+  }
+
+  .vs-settings-row__control input,
+  .vs-settings-row__control select {
+    width: 100% !important;
+  }
+
+  .vs-settings-secret-control {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .vs-settings-secret-control .vs-input-group {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .vs-settings-status-grid {
+    grid-template-columns: 1fr;
+  }
+}
