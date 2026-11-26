@@ -16,6 +16,7 @@ import {
   cancelAdminScan,
   getAdminAuditLogs,
   getAdminDiscoveries,
+  getAdminLoginActivity,
   getAdminOverview,
   getAdminReports,
   getAdminScans,
@@ -35,6 +36,7 @@ import {
   setAdminUserEnabled,
   updateAdminUser,
   type AdminDiscovery,
+  type AdminLoginActivity,
   type AdminReport,
   type AdminScan,
   type AdminUser,
@@ -51,14 +53,14 @@ import {
 import type { DiscoveredHost, Report } from '../types';
 import './AdminPage.css';
 
-type AdminSection = 'overview' | 'users' | 'scans' | 'reports' | 'discoveries' | 'vulnerabilities' | 'audit-logs';
+type AdminSection = 'overview' | 'users' | 'scans' | 'reports' | 'discoveries' | 'vulnerabilities' | 'audit-logs' | 'login-activity';
 
 const dateTime = (value?: string | null) => value ? new Date(value).toLocaleString() : 'Never';
 const shortId = (value?: string | null) => value ? value.slice(0, 8) : '—';
 
 function sectionFromPath(path: string): AdminSection {
   const segment = path.split('/').filter(Boolean)[1];
-  return (['users', 'scans', 'reports', 'discoveries', 'vulnerabilities', 'audit-logs'] as AdminSection[]).includes(segment as AdminSection)
+  return (['users', 'scans', 'reports', 'discoveries', 'vulnerabilities', 'audit-logs', 'login-activity'] as AdminSection[]).includes(segment as AdminSection)
     ? segment as AdminSection
     : 'overview';
 }
@@ -72,7 +74,7 @@ function Status({ value }: { value: string }) {
 function AdminNav({ section, navigate }: { section: AdminSection; navigate: (path: string) => void }) {
   const entries: Array<[AdminSection, string]> = [
     ['overview', 'Overview'], ['users', 'Users'], ['scans', 'Scans'], ['reports', 'Reports'],
-    ['discoveries', 'Discoveries'], ['vulnerabilities', 'Findings'], ['audit-logs', 'Audit Logs'],
+    ['discoveries', 'Discoveries'], ['vulnerabilities', 'Findings'], ['audit-logs', 'Audit Logs'], ['login-activity', 'Login Activity'],
   ];
   return <nav className="vs-admin-nav" aria-label="Administrator sections">
     {entries.map(([id, label]) => <button type="button" key={id} className={section === id ? 'active' : ''} onClick={() => navigate(id === 'overview' ? '/admin' : `/admin/${id}`)}>{label}</button>)}
@@ -194,19 +196,26 @@ function ReportTable({ reports }: { reports: AdminReport[] }) {
 
 function GlobalDataView({ section }: { section: Exclude<AdminSection, 'overview' | 'users'> }) {
   const [search, setSearch] = useState(''); const [status, setStatus] = useState(''); const [severity, setSeverity] = useState(''); const [page, setPage] = useState(1); const [hosts, setHosts] = useState<DiscoveredHost[] | null>(null); const { showToast } = useToast();
+  useEffect(() => { setPage(1); }, [section, search, status, severity]);
   const loader = useMemo(() => async (signal?: AbortSignal): Promise<PaginatedResponse<unknown>> => {
     const common = { page, size: 50 };
     if (section === 'scans') return await getAdminScans({ ...common, target: search, status }, signal);
     if (section === 'reports') return await getAdminReports({ ...common, search, status }, signal);
     if (section === 'discoveries') return await getAdminDiscoveries({ ...common, status }, signal);
     if (section === 'vulnerabilities') return await getAdminVulnerabilities({ ...common, target: search, status, severity }, signal);
+    if (section === 'login-activity') return await getAdminLoginActivity({ ...common, search, status }, signal);
     return await getAdminAuditLogs({ ...common, event_type: search, outcome: status }, signal);
   }, [section, search, status, severity, page]);
   const { data, state, error, refetch, isRefreshing } = useAsync(loader, [loader]);
   const items = data?.items || [];
   const inspectDiscovery = async (item: AdminDiscovery) => { try { setHosts(await getDiscoveryHosts(item.id)); } catch (err) { showToast('error', err instanceof Error ? err.message : 'Inventory unavailable.'); } };
-  return <div className="vs-admin-stack"><div className="vs-admin-toolbar"><div><h2>{section === 'audit-logs' ? 'Security Audit Log' : `Administrative ${section[0].toUpperCase()}${section.slice(1)}`}</h2><p>Persisted records across all authorized users.</p></div><Button variant="outline" leftIcon={<RefreshCw size={15} />} onClick={refetch} isLoading={isRefreshing}>Refresh</Button></div><div className="vs-admin-filters"><Input placeholder={section === 'audit-logs' ? 'Exact event type' : 'Search target or report'} value={search} onChange={(event) => setSearch(event.target.value)} /><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{section === 'audit-logs' ? <><option value="success">Success</option><option value="failure">Failure</option></> : <><option value="queued">Queued</option><option value="running">Running</option><option value="completed">Completed</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option><option value="ready">Ready</option></>}</select>{section === 'vulnerabilities' && <select value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="">All severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="info">Info</option></select>}</div>
-    <StateView state={state} error={error} onRetry={refetch} isRefreshing={isRefreshing}>{data && <>{section === 'scans' ? <ScanTable scans={items as AdminScan[]} onChanged={refetch} /> : section === 'reports' ? <ReportTable reports={items as AdminReport[]} /> : section === 'discoveries' ? <section className="vs-admin-panel"><AdminTable headers={['ID', 'Requester', 'Authorized scope', 'Mode', 'Status', 'Hosts', 'Started', 'Action']}>{(items as AdminDiscovery[]).map((item) => <tr key={item.id}><td>{shortId(item.id)}</td><td>{item.owner_username || 'Platform admin'}</td><td>{item.target}<small>{item.target_kind}</small></td><td>{item.authorization_mode}</td><td><Status value={item.status} /></td><td>{item.hosts_discovered}</td><td>{dateTime(item.started_at || item.created_at)}</td><td><Button size="sm" variant="ghost" onClick={() => void inspectDiscovery(item)}>Inventory</Button></td></tr>)}</AdminTable></section> : section === 'vulnerabilities' ? <section className="vs-admin-panel"><AdminTable headers={['Finding', 'Severity', 'CVSS', 'Target', 'Scan / Owner', 'Status', 'Recorded', 'Remediation']}>{(items as Awaited<ReturnType<typeof getAdminVulnerabilities>>['items']).map((item) => <tr key={item.id}><td><strong>{item.title}</strong><small>{item.cve_id || 'No CVE assigned'} · Confirmed finding</small></td><td><Status value={item.severity} /></td><td>{item.cvss_score ?? '—'}</td><td>{item.target}{item.port ? `:${item.port}` : ''}</td><td>{shortId(item.scan_id)}<small>{item.owner_username || 'Platform admin'}</small></td><td>{item.status}</td><td>{dateTime(item.created_at)}</td><td>{item.remediation || 'Not recorded'}</td></tr>)}</AdminTable></section> : <section className="vs-admin-panel"><AdminTable headers={['Time', 'Actor', 'Event', 'Outcome', 'Resource', 'Safe metadata']}>{(items as Awaited<ReturnType<typeof getAdminAuditLogs>>['items']).map((item) => <tr key={item.id}><td>{dateTime(item.created_at)}</td><td>{item.actor_username || 'System/API key'}</td><td>{item.event_type}</td><td><Status value={item.outcome} /></td><td>{item.resource_type || '—'} {shortId(item.resource_id)}</td><td><code>{JSON.stringify(item.metadata)}</code></td></tr>)}</AdminTable></section>}<div className="vs-admin-pagination"><span>{data.total} records · Page {data.page} of {data.pages}</span><div><Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</Button><Button size="sm" variant="outline" disabled={page >= data.pages} onClick={() => setPage(page + 1)}>Next</Button></div></div></>}</StateView>
+  const sectionTitle = section === 'audit-logs'
+    ? 'Security Audit Log'
+    : section === 'login-activity'
+      ? 'Login Activity'
+      : `Administrative ${section[0].toUpperCase()}${section.slice(1)}`;
+  return <div className="vs-admin-stack"><div className="vs-admin-toolbar"><div><h2>{sectionTitle}</h2><p>Persisted records across all authorized users.</p></div><Button variant="outline" leftIcon={<RefreshCw size={15} />} onClick={refetch} isLoading={isRefreshing}>Refresh</Button></div><div className="vs-admin-filters"><Input placeholder={section === 'audit-logs' ? 'Exact event type' : section === 'login-activity' ? 'Search username' : 'Search target or report'} value={search} onChange={(event) => setSearch(event.target.value)} /><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">All statuses</option>{section === 'audit-logs' ? <><option value="success">Success</option><option value="failure">Failure</option></> : section === 'login-activity' ? <><option value="success">Success</option><option value="failed">Failed</option></> : <><option value="queued">Queued</option><option value="running">Running</option><option value="completed">Completed</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option><option value="ready">Ready</option></>}</select>{section === 'vulnerabilities' && <select value={severity} onChange={(event) => setSeverity(event.target.value)}><option value="">All severities</option><option value="critical">Critical</option><option value="high">High</option><option value="medium">Medium</option><option value="low">Low</option><option value="info">Info</option></select>}</div>
+    <StateView state={state} error={error} onRetry={refetch} isRefreshing={isRefreshing}>{data && <>{section === 'scans' ? <ScanTable scans={items as AdminScan[]} onChanged={refetch} /> : section === 'reports' ? <ReportTable reports={items as AdminReport[]} /> : section === 'discoveries' ? <section className="vs-admin-panel"><AdminTable headers={['ID', 'Requester', 'Authorized scope', 'Mode', 'Status', 'Hosts', 'Started', 'Action']}>{(items as AdminDiscovery[]).map((item) => <tr key={item.id}><td>{shortId(item.id)}</td><td>{item.owner_username || 'Platform admin'}</td><td>{item.target}<small>{item.target_kind}</small></td><td>{item.authorization_mode}</td><td><Status value={item.status} /></td><td>{item.hosts_discovered}</td><td>{dateTime(item.started_at || item.created_at)}</td><td><Button size="sm" variant="ghost" onClick={() => void inspectDiscovery(item)}>Inventory</Button></td></tr>)}</AdminTable></section> : section === 'vulnerabilities' ? <section className="vs-admin-panel"><AdminTable headers={['Finding', 'Severity', 'CVSS', 'Target', 'Scan / Owner', 'Status', 'Recorded', 'Remediation']}>{(items as Awaited<ReturnType<typeof getAdminVulnerabilities>>['items']).map((item) => <tr key={item.id}><td><strong>{item.title}</strong><small>{item.cve_id || 'No CVE assigned'} · Confirmed finding</small></td><td><Status value={item.severity} /></td><td>{item.cvss_score ?? '—'}</td><td>{item.target}{item.port ? `:${item.port}` : ''}</td><td>{shortId(item.scan_id)}<small>{item.owner_username || 'Platform admin'}</small></td><td>{item.status}</td><td>{dateTime(item.created_at)}</td><td>{item.remediation || 'Not recorded'}</td></tr>)}</AdminTable></section> : section === 'login-activity' ? <section className="vs-admin-panel"><AdminTable headers={['Username', 'Browser', 'Operating system', 'Device type', 'Login date & time', 'Login status']}>{(items as AdminLoginActivity[]).map((item) => <tr key={item.id}><td>{item.username || item.attempted_identifier || 'Unknown'}</td><td>{item.browser_name}</td><td>{item.operating_system}</td><td>{item.device_type}</td><td>{dateTime(item.attempted_at)}</td><td><Status value={item.login_status} /></td></tr>)}</AdminTable>{!items.length && <p className="vs-admin-empty">No login activity matches the current filters.</p>}</section> : <section className="vs-admin-panel"><AdminTable headers={['Time', 'Actor', 'Event', 'Outcome', 'Resource', 'Safe metadata']}>{(items as Awaited<ReturnType<typeof getAdminAuditLogs>>['items']).map((item) => <tr key={item.id}><td>{dateTime(item.created_at)}</td><td>{item.actor_username || 'System/API key'}</td><td>{item.event_type}</td><td><Status value={item.outcome} /></td><td>{item.resource_type || '—'} {shortId(item.resource_id)}</td><td><code>{JSON.stringify(item.metadata)}</code></td></tr>)}</AdminTable></section>}<div className="vs-admin-pagination"><span>{data.total} records · Page {data.page} of {data.pages}</span><div><Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</Button><Button size="sm" variant="outline" disabled={page >= data.pages} onClick={() => setPage(page + 1)}>Next</Button></div></div></>}</StateView>
     <Modal isOpen={hosts !== null} onClose={() => setHosts(null)} title="Discovered host inventory" size="lg">{hosts && <AdminTable headers={['Address', 'Hostname', 'State', 'Last seen']}>{hosts.map((host) => <tr key={host.id}><td>{host.ip_address}</td><td>{host.hostname || '—'}</td><td>{host.discovery_status}</td><td>{dateTime(host.last_seen_at)}</td></tr>)}</AdminTable>}</Modal>
   </div>;
 }

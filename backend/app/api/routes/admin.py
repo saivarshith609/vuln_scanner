@@ -17,6 +17,7 @@ from app.core.auth import AuthenticatedOperator, require_admin, revoke_user_sess
 from app.core.passwords import hash_password
 from app.db.session import get_db
 from app.models.audit_log import AuditLog
+from app.models.login_activity import LoginActivity
 from app.models.platform_setting import OperatorSession
 from app.models.report import Report
 from app.models.scan import Scan
@@ -38,6 +39,7 @@ from app.schemas.admin import (
     AdminUserUpdate,
     AdminVulnerabilitySummary,
     AuditLogResponse,
+    LoginActivityResponse,
 )
 from app.schemas.common import PaginatedResponse
 
@@ -614,3 +616,48 @@ def list_audit_logs(
     total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
     rows = db.execute(query.order_by(AuditLog.created_at.desc()).offset((page - 1) * size).limit(size)).all()
     return PaginatedResponse.create([_audit_response(row[0], row[1]) for row in rows], total, page, size)
+
+
+@router.get("/login-activity", response_model=PaginatedResponse[LoginActivityResponse])
+def list_login_activity(
+    search: str | None = None,
+    browser: str | None = None,
+    login_status: str | None = Query(None, alias="status", pattern="^(success|failed)$"),
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    page: int = Query(1, ge=1),
+    size: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_db),
+    _operator: AuthenticatedOperator = Depends(require_admin),
+) -> PaginatedResponse[LoginActivityResponse]:
+    query = select(LoginActivity, User.username).outerjoin(User, LoginActivity.user_id == User.id)
+    if search and search.strip():
+        term = f"%{search.strip()}%"
+        query = query.where(or_(User.username.ilike(term), LoginActivity.attempted_identifier.ilike(term)))
+    if browser and browser.strip():
+        query = query.where(LoginActivity.browser_name == browser.strip())
+    if login_status:
+        query = query.where(LoginActivity.login_status == login_status)
+    if date_from:
+        query = query.where(LoginActivity.attempted_at >= date_from)
+    if date_to:
+        query = query.where(LoginActivity.attempted_at <= date_to)
+    total = db.scalar(select(func.count()).select_from(query.subquery())) or 0
+    rows = db.execute(query.order_by(LoginActivity.attempted_at.desc()).offset((page - 1) * size).limit(size)).all()
+    items = [
+        LoginActivityResponse(
+            id=activity.id,
+            user_id=activity.user_id,
+            username=username,
+            attempted_identifier=activity.attempted_identifier,
+            browser_name=activity.browser_name,
+            browser_version=activity.browser_version,
+            operating_system=activity.operating_system,
+            os_version=activity.os_version,
+            device_type=activity.device_type,
+            login_status=activity.login_status,
+            attempted_at=activity.attempted_at,
+        )
+        for activity, username in rows
+    ]
+    return PaginatedResponse.create(items, total, page, size)

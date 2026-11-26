@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  getAdminLoginActivity,
   getAdminOverview,
   getAdminUsers,
   resetAdminUserPassword,
@@ -56,6 +57,21 @@ describe('administrator control-center API client', () => {
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining('/admin/users/user-1/reset-password'),
       expect.objectContaining({ method: 'POST', credentials: 'include', body: expect.stringContaining(temporary) }),
+    );
+  });
+
+  it('queries login activity with username, status, and pagination filters', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(json({ items: [], total: 0, page: 2, size: 50, pages: 1 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getAdminLoginActivity({
+      search: 'Alice_1',
+      status: 'success',
+      page: 2,
+      size: 50,
+    })).resolves.toMatchObject({ total: 0 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/admin/login-activity?search=Alice_1&status=success&page=2&size=50'),
+      expect.objectContaining({ credentials: 'include' }),
     );
   });
 });

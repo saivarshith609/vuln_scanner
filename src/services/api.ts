@@ -1308,6 +1308,24 @@ export async function getAdminVulnerabilities(params: Record<string, string | nu
   return requireResponse(await request<PaginatedResponse<AdminVulnerability>>(`/admin/vulnerabilities${adminQuery(params)}`, { signal }), 'Administrative findings returned no data.');
 }
 
+export interface AdminLoginActivity {
+  id: string;
+  user_id: string | null;
+  username: string | null;
+  attempted_identifier: string | null;
+  browser_name: string;
+  browser_version: string | null;
+  operating_system: string;
+  os_version: string | null;
+  device_type: string;
+  login_status: 'success' | 'failed';
+  attempted_at: string;
+}
+
 export async function getAdminAuditLogs(params: Record<string, string | number | undefined> = {}, signal?: AbortSignal): Promise<PaginatedResponse<AuditLogEntry>> {
   return requireResponse(await request<PaginatedResponse<AuditLogEntry>>(`/admin/audit-logs${adminQuery(params)}`, { signal }), 'Audit log returned no data.');
+}
+
+export async function getAdminLoginActivity(params: Record<string, string | number | undefined> = {}, signal?: AbortSignal): Promise<PaginatedResponse<AdminLoginActivity>> {
+  return requireResponse(await request<PaginatedResponse<AdminLoginActivity>>(`/admin/login-activity${adminQuery(params)}`, { signal }), 'Login activity returned no data.');
 }

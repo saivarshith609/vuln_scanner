@@ -1,9 +1,10 @@
 """Persistent user accounts plus the existing API-key/session authentication flow."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+import logging
 
 from fastapi import APIRouter, Cookie, Depends, Header, HTTPException, Request, Response, status
-from sqlalchemy import or_, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -21,13 +22,45 @@ from app.core.auth import (
 from app.core.config import get_settings
 from app.core.audit import add_audit_event
 from app.core.passwords import hash_password, verify_password
+from app.core.user_agent import LOGIN_ACTIVITY_RETENTION_DAYS, parse_user_agent
 from app.db.session import get_db
+from app.models.login_activity import LoginActivity
 from app.models.platform_setting import OperatorSession
 from app.models.user import User
 from app.schemas.admin import ChangePasswordRequest
 from app.schemas.auth import LoginRequest, RegisterRequest, SessionResponse, UserResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _record_login_activity(
+    db: Session,
+    request: Request,
+    *,
+    login_status: str,
+    user_id=None,
+    attempted_identifier: str | None = None,
+) -> None:
+    """Persist informational browser/OS metadata without failing or leaking auth details."""
+    try:
+        device = parse_user_agent(request.headers.get("user-agent"))
+        cutoff = datetime.now(timezone.utc) - timedelta(days=LOGIN_ACTIVITY_RETENTION_DAYS)
+        db.execute(delete(LoginActivity).where(LoginActivity.attempted_at < cutoff))
+        db.add(
+            LoginActivity(
+                user_id=user_id,
+                attempted_identifier=(attempted_identifier or "")[:320] or None,
+                browser_name=device.browser_name,
+                browser_version=device.browser_version,
+                operating_system=device.operating_system,
+                os_version=device.os_version,
+                device_type=device.device_type,
+                login_status=login_status,
+            )
+        )
+    except Exception:
+        logger.warning("Unable to record login activity metadata for status=%s", login_status)
 
 
 def _safe_user(user: User) -> UserResponse:
@@ -81,6 +114,13 @@ def _authenticate_user_credentials(
                 "login_scope": login_scope,
             },
         )
+        _record_login_activity(
+            db,
+            request,
+            login_status="failed",
+            user_id=user.id if user is not None else None,
+            attempted_identifier=payload.identifier,
+        )
         db.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username/email or password.")
 
@@ -97,6 +137,13 @@ def _authenticate_user_credentials(
                 "reason": "account_disabled",
                 "login_scope": login_scope,
             },
+        )
+        _record_login_activity(
+            db,
+            request,
+            login_status="failed",
+            user_id=user.id,
+            attempted_identifier=payload.identifier,
         )
         db.commit()
         detail = "Administrator account is inactive." if administrator_only else "Invalid username/email or password."
@@ -121,6 +168,13 @@ def _authenticate_user_credentials(
                 "reason": "administrator_role_required" if administrator_only else "user_role_required",
                 "login_scope": login_scope,
             },
+        )
+        _record_login_activity(
+            db,
+            request,
+            login_status="failed",
+            user_id=user.id,
+            attempted_identifier=payload.identifier,
         )
         db.commit()
         detail = (
@@ -153,6 +207,13 @@ def _create_database_session(
         resource_id=user.id,
         ip_address=request.client.host if request.client else None,
         metadata={"login_scope": login_scope},
+    )
+    _record_login_activity(
+        db,
+        request,
+        login_status="success",
+        user_id=user.id,
+        attempted_identifier=user.username,
     )
     db.commit()
     set_session_cookie(

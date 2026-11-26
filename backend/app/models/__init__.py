@@ -8,6 +8,7 @@ Importing this module ensures all ORM models are loaded so that
 from app.models.asset import Asset
 from app.models.audit_log import AuditLog
 from app.models.authorized_target import AuthorizedTarget
+from app.models.login_activity import LoginActivity
 from app.models.report import Report
 from app.models.platform_setting import (
     IntegrationCredential,
@@ -21,6 +22,7 @@ from app.models.vulnerability import Vulnerability
 from app.models.user import User
 
 __all__ = [
-    "Asset", "AuditLog", "AuthorizedTarget", "IntegrationCredential", "OperatorSession", "PlatformApiKey",
-    "PlatformSetting", "Report", "Scan", "ScanResult", "User", "Vulnerability",
+    "Asset", "AuditLog", "AuthorizedTarget", "IntegrationCredential", "LoginActivity",
+    "OperatorSession", "PlatformApiKey", "PlatformSetting", "Report", "Scan",
+    "ScanResult", "User", "Vulnerability",
 ]

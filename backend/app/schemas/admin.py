@@ -107,6 +107,20 @@ class AuditLogResponse(BaseModel):
     metadata: dict[str, Any]
 
 
+class LoginActivityResponse(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID | None
+    username: str | None
+    attempted_identifier: str | None
+    browser_name: str
+    browser_version: str | None
+    operating_system: str
+    os_version: str | None
+    device_type: str
+    login_status: str
+    attempted_at: datetime
+
+
 class AdminUserDetail(AdminUserSummary):
     sessions: list[AdminSessionSummary]
     recent_events: list[AuditLogResponse]
