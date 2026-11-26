@@ -72,6 +72,30 @@ describe('persistent account authentication UI', () => {
     expect(window.location.pathname).toBe('/login');
   });
 
+  it('accepts a 6-character strong password and rejects a 5-character password on registration', async () => {
+    const browser = userEvent.setup();
+    window.history.replaceState({}, '', '/register');
+    authApi.getAuthSession.mockRejectedValue(new Error('Authentication required'));
+    authApi.registerUser.mockResolvedValue(user);
+    render(<AuthGate><div>Private dashboard</div></AuthGate>);
+
+    await browser.type(await screen.findByLabelText('Full name'), 'Alice Operator');
+    await browser.type(screen.getByLabelText('Username'), 'alice');
+    await browser.type(screen.getByLabelText('Email address'), 'alice@example.com');
+    await browser.type(screen.getByLabelText('Password'), 'Ab1!x');
+    await browser.type(screen.getByLabelText('Confirm password'), 'Ab1!x');
+    await browser.click(screen.getByRole('button', { name: 'Create Account' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Password must be 6-128 characters');
+    expect(authApi.registerUser).not.toHaveBeenCalled();
+
+    await browser.clear(screen.getByLabelText('Password'));
+    await browser.clear(screen.getByLabelText('Confirm password'));
+    await browser.type(screen.getByLabelText('Password'), 'Abc1!x');
+    await browser.type(screen.getByLabelText('Confirm password'), 'Abc1!x');
+    await browser.click(screen.getByRole('button', { name: 'Create Account' }));
+    expect(authApi.registerUser).toHaveBeenCalledWith(expect.objectContaining({ password: 'Abc1!x', confirm_password: 'Abc1!x' }));
+  });
+
   it('logs in with persisted credentials and restores the original safe path', async () => {
     const browser = userEvent.setup();
     window.history.replaceState({}, '', '/scans');

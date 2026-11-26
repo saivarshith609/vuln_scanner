@@ -20,8 +20,8 @@ def normalize_email(value: str) -> str:
 
 
 def validate_password_policy(value: str) -> str:
-    if len(value) < 12 or len(value) > 128:
-        raise ValueError("Password must be between 12 and 128 characters.")
+    if len(value) < 6 or len(value) > 128:
+        raise ValueError("Password must be between 6 and 128 characters.")
     if not re.search(r"[a-z]", value) or not re.search(r"[A-Z]", value):
         raise ValueError("Password must contain uppercase and lowercase letters.")
     if not re.search(r"\d", value) or not re.search(r"[^A-Za-z0-9]", value):

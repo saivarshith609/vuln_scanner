@@ -247,7 +247,8 @@ def test_local_admin_password_reset_preserves_identity_revokes_sessions_and_audi
 @pytest.mark.parametrize(
     ("password", "confirmation", "error"),
     [
-        ("weak", "weak", "between 12 and 128"),
+        ("weak", "weak", "between 6 and 128"),
+        ("Ab1!x", "Ab1!x", "between 6 and 128"),
         ("New!Administrator42", "Different!Administrator42", "confirmation does not match"),
     ],
 )

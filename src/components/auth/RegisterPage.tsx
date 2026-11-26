@@ -19,7 +19,16 @@ export function RegisterPage({ onSubmit, onLogin, error, isSubmitting }: Registe
   const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setValidation('Enter a valid email address.');
-    if (form.password.length < 12 || !/[A-Z]/.test(form.password) || !/[a-z]/.test(form.password) || !/\d/.test(form.password) || !/[^A-Za-z0-9]/.test(form.password)) return setValidation('Use at least 12 characters with uppercase, lowercase, number, and special character.');
+    if (
+      form.password.length < 6
+      || form.password.length > 128
+      || !/[A-Z]/.test(form.password)
+      || !/[a-z]/.test(form.password)
+      || !/\d/.test(form.password)
+      || !/[^A-Za-z0-9]/.test(form.password)
+    ) {
+      return setValidation('Password must be 6-128 characters and include uppercase, lowercase, a number, and a special character.');
+    }
     if (form.password !== form.confirm_password) return setValidation('Password confirmation does not match.');
     setValidation(null);
     void onSubmit(form);

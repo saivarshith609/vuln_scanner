@@ -213,10 +213,34 @@ def test_administrator_temporary_password_still_blocks_control_center(
 @pytest.mark.parametrize("payload", [
     registration_payload("bad email", "not-an-email"),
     registration_payload() | {"password": "weak", "confirm_password": "weak"},
+    registration_payload() | {"password": "Ab1!x", "confirm_password": "Ab1!x"},
+    registration_payload() | {"password": "abcdef1!", "confirm_password": "abcdef1!"},
+    registration_payload() | {"password": "ABCDEF1!", "confirm_password": "ABCDEF1!"},
+    registration_payload() | {"password": "Abcdef!", "confirm_password": "Abcdef!"},
+    registration_payload() | {"password": "Abcdef1", "confirm_password": "Abcdef1"},
     registration_payload() | {"confirm_password": "DifferentPassword!42"},
 ])
 def test_registration_validation_rejects_invalid_input(client: TestClient, payload: dict[str, str]) -> None:
     assert client.post("/api/v1/auth/register", json=payload).status_code == 422
+
+
+def test_registration_and_password_change_accept_six_character_strong_password(client: TestClient) -> None:
+    six_char = "Abc1!x"
+    reg = client.post(
+        "/api/v1/auth/register",
+        json=registration_payload("sixuser", "sixuser@example.com") | {"password": six_char, "confirm_password": six_char},
+    )
+    assert reg.status_code == 201
+    login = client.post("/api/v1/auth/login", json={"identifier": "sixuser", "password": six_char})
+    assert login.status_code == 200
+    csrf = client.cookies.get("vulnscanner_csrf")
+    changed = client.post(
+        "/api/v1/auth/change-password",
+        headers={"X-CSRF-Token": csrf or ""},
+        json={"current_password": six_char, "new_password": "Zyx9@w", "confirm_password": "Zyx9@w"},
+    )
+    assert changed.status_code == 200
+    assert changed.json()["changed"] is True
 
 
 def test_duplicate_username_and_email_are_rejected(client: TestClient) -> None:
