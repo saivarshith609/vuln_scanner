@@ -27,6 +27,34 @@ export function validateUsernamePolicy(username: string): string | null {
   return null;
 }
 
+export interface ChecklistRequirement {
+  id: string;
+  label: string;
+  met: boolean;
+}
+
+export function getUsernameChecklist(username: string): ChecklistRequirement[] {
+  return [
+    { id: 'length', label: 'At least 6 characters', met: username.length >= 6 },
+    { id: 'starts-uppercase', label: 'Starts with an uppercase letter', met: /^[A-Z]/.test(username) },
+    { id: 'number', label: 'Contains at least one number', met: /[0-9]/.test(username) },
+    { id: 'special', label: 'Contains at least one special character', met: /[^A-Za-z0-9\s]/.test(username) },
+    { id: 'no-spaces', label: 'Does not contain spaces', met: username.length > 0 && !/\s/.test(username) },
+  ];
+}
+
+export function getPasswordChecklist(password: string): ChecklistRequirement[] {
+  return [
+    { id: 'min-length', label: 'At least 6 characters', met: password.length >= 6 },
+    { id: 'max-length', label: 'Maximum 20 characters', met: password.length > 0 && password.length <= 20 },
+    { id: 'uppercase', label: 'At least one uppercase letter', met: /[A-Z]/.test(password) },
+    { id: 'lowercase', label: 'At least one lowercase letter', met: /[a-z]/.test(password) },
+    { id: 'number', label: 'At least one number', met: /[0-9]/.test(password) },
+    { id: 'special', label: 'At least one special character', met: /[^A-Za-z0-9\s]/.test(password) },
+    { id: 'spaces-allowed', label: 'Spaces are allowed', met: password.length > 0 },
+  ];
+}
+
 /**
  * Validate password according to VulnScanner account rules.
  * Spaces are allowed anywhere and are never trimmed or normalized.

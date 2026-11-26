@@ -72,42 +72,92 @@ describe('persistent account authentication UI', () => {
     expect(window.location.pathname).toBe('/login');
   });
 
-  it('enforces username and password validation rules including spaces in passwords', async () => {
+  it('hides checklists initially, toggles them on focus/blur, and gates the submit button until all rules pass', async () => {
     const browser = userEvent.setup();
     window.history.replaceState({}, '', '/register');
     authApi.getAuthSession.mockRejectedValue(new Error('Authentication required'));
     authApi.registerUser.mockResolvedValue(user);
     render(<AuthGate><div>Private dashboard</div></AuthGate>);
 
-    await browser.type(await screen.findByLabelText('Full name'), 'Alice Operator');
-    await browser.type(screen.getByLabelText('Username'), 'alice_1');
-    await browser.type(screen.getByLabelText('Email address'), 'alice@example.com');
-    await browser.type(screen.getByLabelText('Password'), 'Abc1!x');
-    await browser.type(screen.getByLabelText('Confirm password'), 'Abc1!x');
-    await browser.click(screen.getByRole('button', { name: 'Create Account' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Username must start with an uppercase letter (A-Z).');
-    expect(authApi.registerUser).not.toHaveBeenCalled();
+    const fullNameInput = await screen.findByLabelText('Full name');
+    const usernameInput = screen.getByLabelText('Username');
+    const emailInput = screen.getByLabelText('Email address');
+    const passwordInput = screen.getByLabelText('Password');
+    const confirmInput = screen.getByLabelText('Confirm password');
+    const submitBtn = screen.getByRole('button', { name: 'Create Account' });
 
-    await browser.clear(screen.getByLabelText('Username'));
-    await browser.type(screen.getByLabelText('Username'), 'Alice_1');
-    await browser.clear(screen.getByLabelText('Password'));
-    await browser.clear(screen.getByLabelText('Confirm password'));
-    await browser.type(screen.getByLabelText('Password'), 'Ab1!x');
-    await browser.type(screen.getByLabelText('Confirm password'), 'Ab1!x');
-    await browser.click(screen.getByRole('button', { name: 'Create Account' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Password must be between 6 and 20 characters.');
-    expect(authApi.registerUser).not.toHaveBeenCalled();
+    // 1. Both checklists hidden on initial load, button disabled
+    expect(screen.queryByRole('region', { name: 'Username requirements' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Password requirements' })).not.toBeInTheDocument();
+    expect(submitBtn).toBeDisabled();
 
-    await browser.clear(screen.getByLabelText('Password'));
-    await browser.clear(screen.getByLabelText('Confirm password'));
-    await browser.type(screen.getByLabelText('Password'), ' Ab1!x ');
-    await browser.type(screen.getByLabelText('Confirm password'), ' Ab1!x ');
-    await browser.click(screen.getByRole('button', { name: 'Create Account' }));
+    // 2. Focusing Username shows ONLY username checklist and updates live
+    await browser.click(usernameInput);
+    const usernameChecklist = screen.getByRole('region', { name: 'Username requirements' });
+    expect(usernameChecklist).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Password requirements' })).not.toBeInTheDocument();
+
+    await browser.type(usernameInput, 'Alice_1');
+    usernameChecklist.querySelectorAll('li').forEach((item) => {
+      expect(item.className).toContain('vs-auth-checklist__item--met');
+    });
+
+    // 3. Moving focus to Password hides username checklist and shows ONLY password checklist
+    await browser.click(passwordInput);
+    expect(screen.queryByRole('region', { name: 'Username requirements' })).not.toBeInTheDocument();
+    const passwordChecklist = screen.getByRole('region', { name: 'Password requirements' });
+    expect(passwordChecklist).toBeInTheDocument();
+
+    // 4. Password visibility toggle keeps password checklist visible
+    await browser.click(screen.getByRole('button', { name: 'Show passwords' }));
+    expect(passwordInput).toHaveAttribute('type', 'text');
+    expect(screen.getByRole('region', { name: 'Password requirements' })).toBeInTheDocument();
+    await browser.click(screen.getByRole('button', { name: 'Hide passwords' }));
+    expect(passwordInput).toHaveAttribute('type', 'password');
+
+    // Type password with leading & trailing spaces
+    await browser.type(passwordInput, ' Ab1!x ');
+    screen.getByRole('region', { name: 'Password requirements' }).querySelectorAll('li').forEach((item) => {
+      expect(item.className).toContain('vs-auth-checklist__item--met');
+    });
+
+    // 5. Focusing another field hides both checklists
+    await browser.click(emailInput);
+    expect(screen.queryByRole('region', { name: 'Username requirements' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Password requirements' })).not.toBeInTheDocument();
+
+    // Fill remaining fields -> button enables
+    await browser.type(fullNameInput, 'Alice Operator');
+    await browser.type(emailInput, 'alice@example.com');
+    await browser.type(confirmInput, ' Ab1!x ');
+    expect(submitBtn).toBeEnabled();
+
+    // Making username invalid disables button again
+    await browser.type(usernameInput, ' ');
+    expect(submitBtn).toBeDisabled();
+    await browser.type(usernameInput, '{Backspace}');
+    expect(submitBtn).toBeEnabled();
+
+    await browser.click(submitBtn);
     expect(authApi.registerUser).toHaveBeenCalledWith(expect.objectContaining({
       username: 'Alice_1',
       password: ' Ab1!x ',
       confirm_password: ' Ab1!x ',
     }));
+  });
+
+  it('never shows registration checklists on the login page or dashboard', async () => {
+    window.history.replaceState({}, '', '/login');
+    authApi.getAuthSession.mockRejectedValueOnce(new Error('Authentication required'));
+    const { rerender } = render(<AuthGate><div>Private dashboard</div></AuthGate>);
+    await screen.findByText('Sign in to VulnScanner');
+    expect(screen.queryByRole('region', { name: 'Username requirements' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Password requirements' })).not.toBeInTheDocument();
+
+    authApi.getAuthSession.mockResolvedValueOnce(session);
+    rerender(<AuthGate><div>Private dashboard</div></AuthGate>);
+    expect(screen.queryByRole('region', { name: 'Username requirements' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Password requirements' })).not.toBeInTheDocument();
   });
 
   it('logs in with persisted credentials and restores the original safe path', async () => {
