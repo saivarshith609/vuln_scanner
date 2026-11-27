@@ -103,7 +103,9 @@ function AppContent() {
     }
   };
 
-  const isDeniedAdminRoute = (currentTab === 'admin' || currentTab === 'settings') && user?.role !== 'admin';
+  const isDeniedAdminRoute =
+    (currentTab === 'admin' || currentTab === 'settings' || currentTab === 'design-system')
+    && user?.role !== 'admin';
   const meta = isDeniedAdminRoute
     ? { title: 'Access denied', subtitle: 'Administrator access required' }
     : reportScanId
